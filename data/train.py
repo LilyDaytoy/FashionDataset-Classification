@@ -1,6 +1,6 @@
-from data.net import ResnetBranch6
-from data.load_data import load_data
-from data.net import xavier
+from .net import ResnetBranch6
+from .load_data import load_data
+from .net import xavier
 import torch.optim as optim
 import torch
 import torch.nn.functional as F
