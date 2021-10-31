@@ -41,3 +41,5 @@ class ResnetBranch6(nn.Module):
 def xavier(m):
     if type(m) == nn.Linear:
         nn.init.xavier_uniform_(m.weight)
+
+
