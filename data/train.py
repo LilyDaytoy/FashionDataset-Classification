@@ -19,19 +19,24 @@ attr_map = {"pattern": 0,
 
 def check_acc(model, data_loader):
     model.eval()
-    num_correct = 0
-    num_samples = 0
+    num_correct = {}
+    num_samples = {}
 
-    for (X, y) in data_loader:
-        scores_list = model(X)
-        scores_dict = {}
+    with torch.no_grad():
+        for (X, y) in data_loader:
+            X = X.to(device=device, dtype=dtype)
+            y = y.to(device=device, dtype=torch.long)
+            scores_list = model(X)
+            preds = {}
+            for attr, index in attr_map.items():
+                _, preds[attr] = scores_list[index].max(dim=1)
+            for attr in attr_map.keys():
+                num_correct[attr] += (preds[attr] == y[attr]).sum()
+                num_samples[attr] += torch.ones(preds[attr].size()).sum()
         for attr in attr_map.keys():
-            scores_dict[attr] = scores_list[attr_map[attr]]
-        for attr, score in scores_dict.items():
-            _, preds = score.max(dim=1)
-            num_correct += (y[attr] == preds).sum()
-            num_samples += torch.ones(preds.size()).sum()
-    print(f'num_correct/num_samples = {num_correct}/{num_samples}, accuracy = {float(num_correct) / num_samples}')
+            print(attr,
+                  f": num_correct/num_samples = {num_correct[attr]}/{num_samples[attr]}, "
+                  f"accuracy = {float(num_correct[attr]) / num_samples[attr]}")
 
 
 def train(model, train_loader, val_loader, optimizer, num_epochs, print_every):
