@@ -1,12 +1,12 @@
-from .net import ResnetBranch6
-from .load_data import load_data
-from .net import xavier
+from data.net import ResnetBranch6
+from data.load_attributes import load_data
+from data.net import xavier
 import torch.optim as optim
 import torch
 import torch.nn.functional as F
 
 
-device = torch.device('cuda')
+device = torch.device('cpu')
 dtype = torch.float32
 
 attr_map = {"pattern": 0,
@@ -19,13 +19,24 @@ attr_map = {"pattern": 0,
 
 def check_acc(model, data_loader):
     model.eval()
-    num_correct = {}
-    num_samples = {}
+    num_correct = {"pattern": 0,
+                   "sleeve": 0,
+                   "length": 0,
+                   "neckline": 0,
+                   "material": 0,
+                   "tightness": 0}
+    num_samples = {"pattern": 0,
+                   "sleeve": 0,
+                   "length": 0,
+                   "neckline": 0,
+                   "material": 0,
+                   "tightness": 0}
 
     with torch.no_grad():
         for (X, y) in data_loader:
             X = X.to(device=device, dtype=dtype)
-            y = y.to(device=device, dtype=torch.long)
+            for attr in attr_map.keys():
+                y[attr] = y[attr].to(device=device, dtype=torch.long)
             scores_list = model(X)
             preds = {}
             for attr, index in attr_map.items():
@@ -44,9 +55,11 @@ def train(model, train_loader, val_loader, optimizer, num_epochs, print_every):
     for epoch in range(num_epochs):
         for i, (X, y) in enumerate(train_loader):
             X = X.to(device=device, dtype=dtype)
-            y = y.to(device=device, dtype=torch.long)
+            for attr in attr_map.keys():   # dict不能直接to device
+                y[attr] = y[attr].to(device=device, dtype=torch.long)
 
             model.train()
+            # import pdb; pdb.set_trace();
             scores_list = model(X)
             scores_dict = {}
             for attr in attr_map.keys():
@@ -69,13 +82,13 @@ def train(model, train_loader, val_loader, optimizer, num_epochs, print_every):
 
 
 # 训练
-train_loader = load_data(batch_size=20)
-val_loader = load_data(is_train=True, is_val=False, batch_size=20)
+train_loader = load_data(root="../FashionDataset", batch_size=20)
+val_loader = load_data(root="../FashionDataset", is_train=False, is_val=True, batch_size=20)
 net = ResnetBranch6()
 net.apply(xavier)  # 对所有fc层作延后初始化
 learning_rate = 5e-5
-params_1x = [param for param, name in net.named_parameters() if name not in ["fc.weight", "fc.bias"]]
-params_fc = [param for param, name in net.named_parameters() if name in ["fc.weight", "fc.bias"]]
+params_1x = [param for name, param in net.named_parameters() if name not in ["fc.weight", "fc.bias"]]
+params_fc = [param for name, param in net.named_parameters() if name in ["fc.weight", "fc.bias"]]
 optimizer = optim.SGD([{'params': params_1x, 'lr': learning_rate},
                        {'params': params_fc, 'lr': learning_rate*10}])
 train(model=net,

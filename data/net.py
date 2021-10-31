@@ -7,38 +7,34 @@ class ResNet50RemoveFC(nn.Module):
         super(ResNet50RemoveFC, self).__init__()
         pretrained_net = models.resnet50(pretrained=True)
         modules = list(pretrained_net.children())[:-1]
-        self.resnet_remove_fc = nn.Sequential(*models)
+        self.resnet_remove_fc = nn.Sequential(*modules)   # resnet_remove_fc是一个去掉fc层的resnet的所有modules的sequential module
 
     def forward(self, X):
         return self.resnet_remove_fc(X)
 
 
-num_classes = {"pattern": 7,
-               "sleeve": 3,
-               "length": 3,
-               "neckline": 4,
-               "material": 6,
-               "tightness": 3}
+num_classes = [7, 3, 3, 4, 6, 3]
 in_features = 2048
 
 
 # 采用延后初始化，单独apply，在network里先不用对初始化作处理
 class ResnetBranch6(nn.Module):
     def __init__(self):
+        super(ResnetBranch6, self).__init__()
         self.pretrained_net_without_fc = ResNet50RemoveFC()
-        self.fc = {}
-        self.fc["pattern"] = nn.Linear(in_features, num_classes["pattern"])
-        self.fc["sleeve"] = nn.Linear(in_features, num_classes["sleeve"])
-        self.fc["length"] = nn.Linear(in_features, num_classes["length"])
-        self.fc["neckline"] = nn.Linear(in_features, num_classes["neckline"])
-        self.fc["material"] = nn.Linear(in_features, num_classes["material"])
-        self.fc["tightness"] = nn.Linear(in_features, num_classes["tightness"])
+        self.fc = nn.ModuleList([nn.Linear(in_features, num_classes[0]),
+                                 nn.Linear(in_features, num_classes[1]),
+                                 nn.Linear(in_features, num_classes[2]),
+                                 nn.Linear(in_features, num_classes[3]),
+                                 nn.Linear(in_features, num_classes[4]),
+                                 nn.Linear(in_features, num_classes[5])])
 
     def forward(self, X):
         output = []
-        for attr in num_classes.keys():
-            net_attr = nn.Sequential(self.pretrained_net_without_fc, self.fc[attr])
-            output.append(net_attr(X))
+        out_pooling = self.pretrained_net_without_fc(X)
+        out_pooling_resized = out_pooling.view(-1, in_features)
+        for i in range(6):
+            output.append(self.fc[i](out_pooling_resized))
         return output
 
 

@@ -9,10 +9,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
+
 class FashionDataset(Dataset):
 
     def __init__(self,
-                 root: str = "./FashionDataset",
+                 root: str = "../FashionDataset",
                  is_train: bool = True,
                  is_val: bool = False,
                  transform: Optional[Callable] = None,
@@ -81,11 +82,11 @@ class FashionDataset(Dataset):
         return len(self.data)
 
 
-def load_data(root: str = "./FashionDataset",
+def load_data(root: str = "../FashionDataset",
               is_train: bool = True,
               is_val: bool = True,
               batch_size: int = 256,
-              num_workers: int = 4
+              num_workers: int = 0
               ) -> DataLoader:
     normalize = tfm.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     train_aug = tfm.Compose([tfm.transforms.RandomResizedCrop(224),
@@ -101,7 +102,7 @@ def load_data(root: str = "./FashionDataset",
 
 
 device = torch.device("cuda")
-dtype = torch.floar32
+dtype = torch.float32
 num_classes = {"pattern": 7,
                "sleeve": 3,
                "length": 3,
@@ -109,57 +110,46 @@ num_classes = {"pattern": 7,
                "material": 6,
                "tightness": 3}
 
+# baseline
+# def check_acc(model, data_loader, attribute):
+#     num_correct = 0
+#     num_samples = 0
+#     for X, y in data_loader:
+#         X = X.to(device=device,dtype=dtype)
+#         y = y[attribute].to(device=device, dtype=torch.long)
+#         model.eval()
+#         scores = model(X)
+#         _, preds = scores.max(dim=1)
+#         num_correct += (preds == y).sum()
+#         num_samples += torch.ones(preds.size()).sum()
+#     print(f'num_correct/num_samples = {num_correct}/{num_samples}, accuracy = {float(num_correct) / num_samples}')
+#
+#
+# def train(attribute, model, train_loader, val_loader, optimizer, num_epochs = 10, print_every = 10):
+#     model = model.to(device=device)
+#     for epoch in range(num_epochs):
+#         for i, (X, y) in enumerate(train_loader):
+#             # y is a dictionary with 6 attributes, each attribute has a batch_size of data
+#             X = X.to(device=device, dtype=dtype)
+#             y = y[attribute].to(device=device, dtype=torch.long)
+#
+#             model.train()
+#             scores = model(X)
+#             loss = F.cross_entropy(scores, y)
+#
+#             optimizer.zero_grad()
+#             loss.backward()
+#             optimizer.step()
+#
+#             if i % print_every == 0:
+#                 print(f"epoch {epoch}, iteration {i}, loss = {loss}")
+#                 print("train accuracy: ")
+#                 check_acc(model, train_loader, attribute=attribute)
+#                 print("val accuracy: ")
+#                 check_acc(model, val_loader, attribute=attribute)
+#                 print()
 
-def check_acc(model, data_loader, attribute):
-    num_correct = 0
-    num_samples = 0
-    for X, y in data_loader:
-        X = X.to(device=device,dtype=dtype)
-        y = y[attribute].to(device=device, dtype=torch.long)
-        model.eval()
-        scores = model(X)
-        _, preds = scores.max(dim=1)
-        num_correct += (preds == y).sum()
-        num_samples += torch.ones(preds.size()).sum()
-    print(f'num_correct/num_samples = {num_correct}/{num_samples}, accuracy = {float(num_correct) / num_samples}')
 
 
-def train(attribute, model, train_loader, val_loader, optimizer, num_epochs = 10, print_every = 10):
-    model = model.to(device=device)
-    for epoch in range(num_epochs):
-        for i, (X, y) in enumerate(train_loader):
-            # y is a dictionary with 6 attributes, each attribute has a batch_size of data
-            X = X.to(device=device, dtype=dtype)
-            y = y[attribute].to(device=device, dtype=torch.long)
-
-            model.train()
-            scores = model(X)
-            loss = F.cross_entropy(scores, y)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            if i % print_every == 0:
-                print(f"epoch {epoch}, iteration {i}, loss = {loss}")
-                print("train accuracy: ")
-                check_acc(model, train_loader, attribute=attribute)
-                print("val accuracy: ")
-                check_acc(model, val_loader, attribute=attribute)
-                print()
-
-
-# pattern
-learning_rate = 5e-5
-# re-initialize the last fc layer with the corresponding num_classes of the specific attribute
-pretrained_net = models.resnet50(pretrained=True)
-pretrained_net.fc = nn.Linear(pretrained_net.fc.in_features, num_classes["pattern"])
-nn.init.xavier_uniform_(pretrained_net.fc.weight)
-params_1x = [param for name, param in pretrained_net.named_parameters() if name not in ["fc.weight", "fc.bias"]]
-optimizer = torch.optim.SGD([{'params': params_1x},
-                 {'params': pretrained_net.fc.parameters(), 'lr': learning_rate * 10}], lr=learning_rate, weight_decay=0.001)
-train_loader = load_data(batch_size=20)
-val_loader = load_data(is_train=False, is_val=True, batch_size=20)
-train(pretrained_net, train_loader=train_loader, val_loader=val_loader, optimizer=optimizer, num_epochs=10)
 
 
